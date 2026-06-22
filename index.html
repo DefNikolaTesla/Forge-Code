@@ -247,7 +247,7 @@
     </div>
   </aside>
 
-  <div class="flex-1 flex flex-col h-full min-w-0 relative">
+  <div class="flex-1 flex flex-col h-full min-w-0 relative pb-[64px] md:pb-0">
 
     <div id="chatView" class="flex-1 flex flex-col min-h-0">
       <header id="topbar" class="flex items-center gap-2 px-4 shrink-0" style="height:60px; border-bottom:1px solid var(--line); background:var(--canvas); padding-top:env(safe-area-inset-top);">
@@ -272,7 +272,7 @@
         <div id="chatMessages" class="max-w-3xl mx-auto py-5"></div>
       </main>
 
-      <div id="inputBar" class="shrink-0 px-3 md:px-6 pt-2" style="padding-bottom:calc(14px + env(safe-area-inset-bottom));">
+      <div id="inputBar" class="shrink-0 px-3 md:px-6 pt-2 pb-3 md:pb-4" style="padding-bottom: max(12px, env(safe-area-inset-bottom));">
         <div class="max-w-3xl mx-auto">
           <div class="flex md:hidden items-center gap-2 mb-2">
             <button class="rounded-full px-3 py-1.5 text-[12px] font-medium flex items-center gap-1.5" style="background:var(--surface-2); border:1px solid var(--line); color:var(--ink)" data-action="open-quickpick" data-kind="model" id="modelPillMobile"></button>
@@ -1679,102 +1679,3 @@ document.addEventListener('scroll', (e) => {
   if (e.target.id === 'editorTextarea') $('editorGutter').scrollTop = e.target.scrollTop;
 }, true);
 
-// ---------- Static element bindings ----------
-$('chatForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  if (ui.sending) { stopGenerating(); return; }
-  sendMessage($('chatInput').value);
-});
-$('chatInput').addEventListener('input', autoResizeInput);
-$('chatInput').addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('chatForm').requestSubmit(); }
-});
-$('promptForm').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const val = $('promptModalInput').value.trim();
-  hideModal('promptModal');
-  if (ui.promptResolve) { ui.promptResolve(val || null); ui.promptResolve = null; }
-});
-$('confirmModalConfirmBtn').addEventListener('click', () => {
-  hideModal('confirmModal');
-  if (ui.confirmResolve) { ui.confirmResolve(true); ui.confirmResolve = null; }
-});
-
-document.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); ui.paletteOpen ? closeCommandPalette() : openCommandPalette(); }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); actionNewProject(); }
-  if (e.key === 'Escape') {
-    if ($('quickpickModal')) closeQuickpick();
-    else if (!$('commandPalette').classList.contains('hidden')) closeCommandPalette();
-    else if (!$('fileModal').classList.contains('hidden')) closeFileModal(), hideModal('fileModal');
-    else if (!$('previewModal').classList.contains('hidden')) closeModalGeneric('previewModal');
-    else if (!$('confirmModal').classList.contains('hidden')) closeModalGeneric('confirmModal');
-    else if (!$('promptModal').classList.contains('hidden')) closeModalGeneric('promptModal');
-  }
-});
-
-// ---------- PWA install ----------
-let deferredPrompt = null;
-function isStandalone() { return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true; }
-function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
-function showInstallBanner(iosMode) {
-  if (isStandalone() || sessionStorage.getItem('forge-install-dismissed')) return;
-  $('installBannerSub').textContent = iosMode ? 'Tap Share, then "Add to Home Screen"' : 'Add to your home screen for the full app experience';
-  $('installBannerAction').style.display = iosMode ? 'none' : '';
-  $('installBanner').classList.remove('hidden');
-}
-function hideInstallBanner(remember) {
-  $('installBanner').classList.add('hidden');
-  if (remember) sessionStorage.setItem('forge-install-dismissed', '1');
-}
-async function installApp() {
-  if (!deferredPrompt) return;
-  deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
-  hideInstallBanner();
-}
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  showInstallBanner(false);
-});
-window.addEventListener('appinstalled', () => {
-  hideInstallBanner();
-  toast('Forge Code installed', 'success');
-  deferredPrompt = null;
-});
-
-// ---------- Service worker ----------
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  });
-}
-
-// ---------- Boot ----------
-function boot() {
-  applyTheme();
-  paintStaticIcons();
-  renderThemeButtons();
-
-  if (!store.projects.length) {
-    const p = newProject('My First Project');
-    store.projects.push(p);
-    store.currentProjectId = p.id;
-    saveStore();
-  }
-
-  renderAllShell();
-  setView('chat');
-  autoResizeInput();
-
-  setTimeout(() => {
-    if (isIOS() && !isStandalone()) showInstallBanner(true);
-  }, 1800);
-}
-
-boot();
-</script>
-</body>
-</html>
