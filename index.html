@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Forge Code</title>
+<meta name="description" content="Personal Groq-powered AI coding assistant" />
+<link rel="manifest" href="./manifest.json" />
+<meta name="theme-color" content="#0A0B0D" id="metaThemeColor" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Forge Code" />
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['-apple-system','BlinkMacSystemFont','Segoe UI','Roboto','Helvetica Neue','Arial','sans-serif'],
+        mono: ['SF Mono','Cascadia Code','Roboto Mono','Menlo','Consolas','monospace']
+      },
+      keyframes: {
+        fadeUp:   { '0%':{ opacity:0, transform:'translateY(8px)' }, '100%':{ opacity:1, transform:'translateY(0)' } },
+        popIn:    { '0%':{ opacity:0, transform:'scale(.95)' }, '100%':{ opacity:1, transform:'scale(1)' } },
+        sheetUp:  { '0%':{ transform:'translateY(100%)' }, '100%':{ transform:'translateY(0)' } },
+        pulse2:   { '0%,100%':{ opacity:1 }, '50%':{ opacity:.3 } },
+        spin:     { '100%':{ transform:'rotate(360deg)' } }
+      },
+      animation: {
+        'fade-up':  'fadeUp .32s cubic-bezier(.16,1,.3,1) both',
+        'pop-in':   'popIn .22s cubic-bezier(.16,1,.3,1) both',
+        'sheet-up': 'sheetUp .32s cubic-bezier(.16,1,.3,1) both',
+        'pulse2':   'pulse2 1.4s ease-in-out infinite',
+        'spin':     'spin .7s linear infinite'
+      }
+    }
+  }
+};
+</script>
+<style type="text/tailwindcss">
+:root, html.dark {
+  --canvas:    #0A0B0D;
+  --s1:        #15171B;
+  --s2:        #1C1F24;
+  --s3:        #25282E;
+  --line:      #2A2D33;
+  --ink:       #F2F3F5;
+  --muted:     #9AA0AA;
+  --faint:     #5C6168;
+  --ember:     #FF7A45;
+  --steel:     #7FA8C9;
+  --danger:    #FF6B5E;
+  --success:   #4ADE80;
+  --tab-h:     64px;
+}
+html.light {
+  --canvas:  #F5F5F3;
+  --s1:      #FFFFFF;
+  --s2:      #EEEEEC;
+  --s3:      #E4E4E0;
+  --line:    #DDDDD8;
+  --ink:     #16181B;
+  --muted:   #5C6168;
+  --faint:   #9498A0;
+  --ember:   #D95328;
+  --steel:   #2E6488;
+  --danger:  #C93A38;
+  --success: #1A9450;
+}
+* { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+html, body { height: 100%; overscroll-behavior: none; }
+body { background: var(--canvas); color: var(--ink); -webkit-font-smoothing: antialiased; }
+input, textarea, select, button { font-family: inherit; font-size: 16px; }
+
+/* Scrollbars */
+.thin-scroll::-webkit-scrollbar { width: 4px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 9px; }
+.no-scroll { overflow: hidden; }
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 font-medium select-none transition-all duration-150 active:scale-[.97] disabled:opacity-40 disabled:pointer-events-none; }
+  .btn-primary  { @apply btn rounded-xl px-4 py-3 text-white; background: var(--ember); }
+  .btn-primary:hover  { filter: brightness(1.1); }
+  .btn-secondary { @apply btn rounded-xl px-4 py-3; background: var(--s2); color: var(--ink); border: 1px solid var(--line); }
+  .btn-secondary:hover { background: var(--s3); }
+  .btn-ghost    { @apply btn rounded-xl px-3 py-2; color: var(--muted); }
+  .btn-ghost:hover { color: var(--ink); background: var(--s2); }
+  .btn-icon     { @apply btn rounded-xl shrink-0; width:44px; height:44px; color: var(--muted); }
+  .btn-icon:hover { color: var(--ink); background: var(--s2); }
+  .btn-icon-sm  { @apply btn rounded-xl shrink-0; width:36px; height:36px; color: var(--muted); }
+  .btn-icon-sm:hover { color: var(--ink); background: var(--s2); }
+  .input-field  { @apply w-full rounded-xl px-4 py-3 outline-none transition-colors; background: var(--s2); border: 1px solid var(--line); color: var(--ink); font-size:15px; }
+  .input-field::placeholder { color: var(--faint); }
+  .input-field:focus { border-color: var(--steel); box-shadow: 0 0 0 3px color-mix(in srgb, var(--steel) 20%, transparent); }
+  .row-item { @apply flex items-center gap-3 rounded-xl px-3 py-2.5 cursor-pointer transition-colors; min-height:48px; }
+  .row-item:hover { background: var(--s2); }
+  .row-item.active { background: var(--s2); border: 1px solid var(--line); }
+  .tab-btn  { @apply flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors text-[10px] font-medium; color: var(--faint); }
+  .tab-btn.active { color: var(--ember); }
+  .modal-bg { @apply fixed inset-0 z-50 flex items-end md:items-center justify-center; background: rgba(0,0,0,.55); backdrop-filter: blur(3px); }
+  .modal-box { @apply w-full md:max-w-lg flex flex-col; background: var(--s1); border: 1px solid var(--line); }
+  .sheet { @apply fixed inset-x-0 bottom-0 z-40 flex flex-col; background: var(--canvas); border-top: 1px solid var(--line); }
+}
+
+/* Code blocks */
+.code-wrap { margin: .5em 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--canvas); }
+.code-head  { display:flex; align-items:center; justify-content:space-between; padding: .4em .8em; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color: var(--faint); background: var(--s2); border-bottom: 1px solid var(--line); }
+.code-body  { margin:0; padding:.8em 1em; overflow-x:auto; font-family:ui-monospace,SF Mono,Menlo,Consolas,monospace; font-size:13px; line-height:1.65; }
+.tok-kw  { color: var(--steel); }
+.tok-str { color: var(--success); }
+.tok-cmt { color: var(--faint); font-style:italic; }
+.tok-num { color: var(--ember); }
+.ic { display:inline-block; width:100%; height:100%; }
+.msg-prose p { margin:.4em 0; }
+.msg-prose p:last-child { margin-bottom:0; }
+.msg-prose ul { margin:.3em 0 .5em 1.1em; }
+.msg-prose ul li { list-style:disc; margin:.15em 0; }
+.msg-prose .ikc { font-family:ui-monospace,SF Mono,Menlo,Consolas,monospace; font-size:.87em; padding:.12em .38em; border-radius:.3em; background:var(--s3); color:var(--ember); }
+.forging-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--ember); animation:pulse2 1.1s ease-in-out infinite; }
+
+/* Toast */
+#toastRoot { position:fixed; left:0; right:0; bottom:calc(var(--tab-h) + 12px); display:flex; flex-direction:column; align-items:center; gap:8px; z-index:80; pointer-events:none; padding:0 16px; }
+@media(min-width:768px){ #toastRoot { bottom:20px; } }
+.toast-el { pointer-events:auto; display:flex; align-items:center; gap:9px; max-width:400px; width:100%; padding:12px 15px; border-radius:14px; background:var(--s2); border:1px solid var(--line); box-shadow:0 12px 32px -8px rgba(0,0,0,.55); opacity:0; transform:translateY(6px) scale(.97); transition:opacity .22s, transform .22s; font-size:13.5px; font-weight:500; color:var(--ink); }
+.toast-el.show { opacity:1; transform:translateY(0) scale(1); }
+.toast-el svg { width:16px; height:16px; flex-shrink:0; }
+.toast-success svg { color:var(--success); } .toast-error svg { color:var(--danger); } .toast-warn svg { color:var(--ember); } .toast-info svg { color:var(--steel); }
+
+/* Spinner */
+.spinner { width:18px; height:18px; border-radius:50%; border:2.5px solid rgba(255,255,255,.25); border-top-color:#fff; animation:spin .7s linear infinite; }
+
+/* Range */
+input[type=range].forge-range { -webkit-appearance:none; width:100%; height:4px; border-radius:99px; background:var(--s3); }
+input[type=range].forge-range::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; background:var(--ember); border:3px solid var(--canvas); cursor:pointer; }
+
+@media(prefers-reduced-motion:reduce){ *, *::before, *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+button:focus-visible, a:focus-visible { outline:2px solid var(--steel); outline-offset:2px; border-radius:6px; }
+</style>
+</head>
+<body class="h-full font-sans overflow-hidden">
+
+<!-- ═══════════════════════════════════════════════
+     APP SHELL
+     Layout on mobile:
+       - header (fixed top, 60px)
+       - chat messages (scrolls between header and inputbar)
+       - input bar (fixed above tab bar)
+       - tab bar (fixed bottom, 64px)
+     Layout on desktop:
+       - sidebar (left, fixed width)
+       - right column fills rest, header + scroll + inputbar
+     ═══════════════════════════════════════════════ -->
+
+<div id="app" class="h-full flex">
+
+  <!-- Desktop sidebar -->
+  <aside id="sidebar" class="hidden md:flex flex-col w-72 lg:w-80 shrink-0 h-full" style="background:var(--s1); border-right:1px solid var(--line);">
+    <div class="flex items-center gap-2.5 px-5 pt-5 pb-4">
+      <span class="w-6 h-6 shrink-0" style="color:var(--ember)" id="sidebarLogo"></span>
+      <span class="text-[15px] font-bold tracking-tight" style="color:var(--ink)">Forge Code</span>
+    </div>
+    <div class="px-3 mb-2">
+      <button class="btn-primary w-full !py-2.5 text-[13.5px]" data-action="new-project">
+        <span class="w-4 h-4" id="sbPlusIco"></span> New project
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto thin-scroll px-3 pb-3 space-y-4">
+      <div>
+        <p class="text-[10.5px] font-semibold uppercase tracking-wider px-1 py-2" style="color:var(--faint)">Projects</p>
+        <div id="sbProjectsList"></div>
+      </div>
+      <div>
+        <p class="text-[10.5px] font-semibold uppercase tracking-wider px-1 py-2" style="color:var(--faint)">Files</p>
+        <div id="sbFilesList"></div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1 px-3 py-3" style="border-top:1px solid var(--line);">
+      <button class="btn-icon-sm" data-action="set-view" data-view="settings" id="sbSettingsBtn"></button>
+      <button class="btn-icon-sm" data-action="cycle-theme" id="sbThemeBtn"></button>
+      <button class="btn-icon-sm" data-action="open-palette" id="sbPaletteBtn"></button>
+      <div class="flex-1"></div>
+      <button class="btn-icon-sm" data-action="open-preview" id="sbPreviewBtn"></button>
+    </div>
+  </aside>
+
+  <!-- Main column -->
+  <div class="flex-1 flex flex-col min-w-0 h-full">
+
+    <!-- ── CHAT VIEW ── -->
+    <div id="viewChat" class="flex flex-col h-full">
+
+      <!-- Top bar -->
+      <header class="shrink-0 flex items-center gap-2 px-3 md:px-4" style="height:60px; background:var(--canvas); border-bottom:1px solid var(--line); padding-top:env(safe-area-inset-top);">
+        <button class="md:hidden btn-icon-sm -ml-1" data-action="set-view" data-view="projects">
+          <span class="w-[22px] h-[22px]" style="color:var(--ember)" id="topLogo"></span>
+        </button>
+        <div class="flex-1 min-w-0">
+          <p class="text-[15px] font-semibold truncate" style="color:var(--ink)" id="topTitle">Forge Code</p>
+          <p class="text-[11px] hidden md:block" style="color:var(--faint)" id="topSub">AI coding assistant</p>
+        </div>
+        <button class="hidden md:flex btn-secondary !py-1.5 !px-3 text-[12.5px] items-center gap-1.5" data-action="open-qp" data-kind="model" id="modelPillD"></button>
+        <button class="hidden md:flex btn-secondary !py-1.5 !px-3 text-[12.5px] items-center gap-1.5" data-action="open-qp" data-kind="vibe" id="vibePillD"></button>
+        <button class="btn-icon-sm" data-action="open-palette" id="topPaletteBtn"></button>
+      </header>
+
+      <!-- Messages scroll area -->
+      <!-- On mobile: bottom padding = input bar height + tab bar height -->
+      <!-- On desktop: bottom padding = input bar height only (no tabs) -->
+      <div id="chatScroll" class="flex-1 overflow-y-auto thin-scroll" style="scroll-behavior:smooth;">
+        <div id="chatMessages" class="max-w-3xl mx-auto px-3 md:px-5 py-4 pb-2"></div>
+      </div>
+
+      <!-- Input bar — sits naturally at bottom of flex column -->
+      <div id="inputBar" class="shrink-0 px-3 md:px-5 pt-2"
+           style="padding-bottom: calc(env(safe-area-inset-bottom) + 12px);
+                  background: var(--canvas);
+                  border-top: 1px solid var(--line);">
+
+        <!-- Mobile: model + vibe pills row -->
+        <div class="flex md:hidden items-center gap-2 pb-2">
+          <button class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium" style="background:var(--s2);border:1px solid var(--line);color:var(--ink);" data-action="open-qp" data-kind="model" id="modelPillM"></button>
+          <button class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium" style="background:var(--s2);border:1px solid var(--line);color:var(--ink);" data-action="open-qp" data-kind="vibe" id="vibePillM"></button>
+        </div>
+
+        <form id="chatForm" class="flex items-end gap-2 rounded-[20px] px-2 py-1.5" style="background:var(--s1);border:1px solid var(--line);box-shadow:0 4px 24px -6px rgba(0,0,0,.4);">
+          <button type="button" class="btn-icon-sm self-end mb-0.5" data-action="open-palette" id="chatCmdBtn"></button>
+          <textarea id="chatInput" rows="1"
+            placeholder="Ask Forge to build, fix, or explain…"
+            class="flex-1 bg-transparent outline-none py-2.5 leading-snug"
+            style="resize:none; max-height:130px; color:var(--ink); font-size:15px; overflow-y:auto;"></textarea>
+          <button type="submit" id="sendBtn"
+            class="btn-icon self-end mb-0.5 !rounded-2xl"
+            style="background:var(--ember);color:#fff;" aria-label="Send">
+            <span class="w-[18px] h-[18px]" id="sendIco"></span>
+          </button>
+        </form>
+        <p class="hidden md:block text-center text-[10.5px] mt-2" style="color:var(--faint)">⌘↵ to send · ⌘K commands</p>
+      </div>
+
+      <!-- Spacer for mobile tab bar — pushes input bar up -->
+      <div class="md:hidden shrink-0" style="height:var(--tab-h);"></div>
+    </div><!-- /viewChat -->
+
+    <!-- ── SETTINGS VIEW ── -->
+    <div id="viewSettings" class="hidden flex-col h-full">
+      <header class="shrink-0 flex items-center gap-2 px-3 md:px-4" style="height:60px; border-bottom:1px solid var(--line); padding-top:env(safe-area-inset-top);">
+        <button class="btn-icon-sm -ml-1" data-action="set-view" data-view="chat" id="settingsBackBtn"></button>
+        <span class="text-[15px] font-semibold" style="color:var(--ink)">Settings</span>
+      </header>
+      <div id="settingsBody" class="flex-1 overflow-y-auto thin-scroll"></div>
+      <div class="md:hidden shrink-0" style="height:var(--tab-h);"></div>
+    </div>
+
+  </div><!-- /main column -->
+</div><!-- /app -->
+
+<!-- ═══════ MOBILE TAB BAR ═══════ -->
+<nav id="tabBar" class="md:hidden fixed inset-x-0 bottom-0 z-40 flex"
+     style="height:var(--tab-h); background:var(--s1); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom);">
+  <button class="tab-btn active" data-action="set-view" data-view="chat" data-tab="chat">
+    <span class="w-[22px] h-[22px]" id="tabIcoChat"></span><span>Chat</span>
+  </button>
+  <button class="tab-btn" data-action="set-view" data-view="files" data-tab="files">
+    <span class="w-[22px] h-[22px] relative" id="tabIcoFiles">
+      <span id="filesBadge" class="hidden absolute -top-1 -right-1.5 min-w-[15px] h-[15px] px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center" style="background:var(--ember);color:#fff;"></span>
+    </span>
+    <span>Files</span>
+  </button>
+  <button class="tab-btn" data-action="set-view" data-view="projects" data-tab="projects">
+    <span class="w-[22px] h-[22px]" id="tabIcoProjects"></span><span>Projects</span>
+  </button>
+  <button class="tab-btn" data-action="set-view" data-view="settings" data-tab="settings">
+    <span class="w-[22px] h-[22px]" id="tabIcoSettings"></span><span>Settings</span>
+  </button>
+</nav>
+
+<!-- ═══════ MOBILE SHEETS (files / projects) ═══════ -->
+<div id="sheetFiles" class="sheet hidden" style="top:0; padding-bottom:var(--tab-h);">
+  <header class="shrink-0 flex items-center gap-2 px-3" style="height:60px;border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top);">
+    <span class="flex-1 text-[16px] font-semibold" style="color:var(--ink)">Files</span>
+    <button class="btn-icon-sm" data-action="new-file" id="sheetFilesNew"></button>
+  </header>
+  <div id="sheetFilesList" class="flex-1 overflow-y-auto thin-scroll px-3 py-2"></div>
+</div>
+
+<div id="sheetProjects" class="sheet hidden" style="top:0; padding-bottom:var(--tab-h);">
+  <header class="shrink-0 flex items-center gap-2 px-3" style="height:60px;border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top);">
+    <span class="flex-1 text-[16px] font-semibold" style="color:var(--ink)">Projects</span>
+    <button class="btn-icon-sm" data-action="new-project" id="sheetProjectsNew"></button>
+  </header>
+  <div id="sheetProjectsList" class="flex-1 overflow-y-auto thin-scroll px-3 py-2"></div>
+</div>
+
+<!-- ═══════ MODALS ═══════ -->
+
+<!-- File editor -->
+<div id="modalFile" class="modal-bg hidden">
+  <div class="modal-box rounded-t-3xl md:rounded-2xl h-[92dvh] md:h-[82vh] animate-sheet-up md:animate-pop-in">
+    <header class="shrink-0 flex items-center gap-2 px-3" style="height:56px;border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top);">
+      <button class="btn-icon-sm -ml-1" data-action="close-modal" data-modal="modalFile" id="fileMClose"></button>
+      <div class="flex-1 min-w-0">
+        <input id="fileMName" class="bg-transparent outline-none text-[15px] font-semibold w-full" style="color:var(--ink);" />
+        <div class="flex gap-1.5 text-[11px]" style="color:var(--faint)">
+          <span id="fileMlang"></span><span>·</span><span id="fileMlines"></span>
+          <span id="fileMsaved" class="opacity-0 transition-opacity" style="color:var(--success);">Saved</span>
+        </div>
+      </div>
+      <button class="btn-icon-sm" data-action="file-copy" id="fileMCopy"></button>
+      <button class="btn-icon-sm" data-action="file-download" id="fileMDown"></button>
+      <button class="btn-icon-sm" data-action="file-delete" id="fileMDel"></button>
+    </header>
+    <div class="shrink-0 flex items-center gap-1 px-3 py-2" style="border-bottom:1px solid var(--line);">
+      <button class="px-3 py-1.5 rounded-lg text-[12.5px] font-medium" data-action="editor-mode" data-mode="edit" id="edEditBtn">Edit</button>
+      <button class="px-3 py-1.5 rounded-lg text-[12.5px] font-medium" data-action="editor-mode" data-mode="preview" id="edViewBtn">Preview</button>
+    </div>
+    <div class="flex-1 min-h-0 relative overflow-hidden">
+      <div id="edEditWrap" class="absolute inset-0 flex">
+        <div id="edGutter" class="shrink-0 overflow-hidden text-right select-none px-2 py-3 text-[13px] leading-[1.65] font-mono" style="color:var(--faint);background:var(--canvas);min-width:2.5rem;"></div>
+        <textarea id="edTA" spellcheck="false" autocapitalize="off" autocorrect="off"
+          class="flex-1 h-full bg-transparent outline-none resize-none px-3 py-3 text-[13px] leading-[1.65] font-mono thin-scroll"
+          style="color:var(--ink);"></textarea>
+      </div>
+      <div id="edPreviewWrap" class="hidden absolute inset-0 overflow-auto thin-scroll px-4 py-3">
+        <pre class="text-[13px] leading-[1.65] font-mono whitespace-pre-wrap break-words"><code id="edPreviewCode"></code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview -->
+<div id="modalPreview" class="modal-bg hidden">
+  <div class="modal-box rounded-t-3xl md:rounded-2xl h-[92dvh] md:h-[85vh] animate-sheet-up md:animate-pop-in">
+    <header class="shrink-0 flex items-center gap-2 px-3" style="height:56px;border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top);">
+      <button class="btn-icon-sm -ml-1" data-action="close-modal" data-modal="modalPreview" id="previewClose"></button>
+      <span class="flex-1 text-[15px] font-semibold truncate" id="previewTitle" style="color:var(--ink)">Live Preview</span>
+      <button class="btn-icon-sm" data-action="preview-refresh" id="previewRefresh"></button>
+      <button class="btn-icon-sm" data-action="preview-newtab" id="previewTab"></button>
+    </header>
+    <div class="flex-1 min-h-0 relative" style="background:#fff;">
+      <iframe id="previewFrame" class="w-full h-full hidden" sandbox="allow-scripts allow-modals allow-forms"></iframe>
+      <div id="previewEmpty" class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-8 text-center" style="background:var(--canvas);">
+        <span class="w-10 h-10" style="color:var(--faint)" id="previewEmptyIco"></span>
+        <p class="text-[15px] font-semibold" style="color:var(--ink)">No HTML yet</p>
+        <p class="text-[13px]" style="color:var(--muted)">Ask Forge to build something with an <code class="ikc">index.html</code> and it'll appear here.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick-pick (model / vibe) -->
+<div id="modalQP" class="modal-bg hidden">
+  <div class="modal-box rounded-t-3xl md:rounded-2xl animate-sheet-up md:animate-pop-in">
+    <header class="shrink-0 flex items-center gap-2 px-3" style="height:54px;border-bottom:1px solid var(--line);">
+      <span class="flex-1 text-[14.5px] font-semibold" id="qpTitle" style="color:var(--ink)"></span>
+      <button class="btn-icon-sm" data-action="close-modal" data-modal="modalQP" id="qpClose"></button>
+    </header>
+    <div id="qpList" class="p-2 max-h-[55vh] overflow-y-auto thin-scroll space-y-1"></div>
+  </div>
+</div>
+
+<!-- Command palette -->
+<div id="modalPalette" class="modal-bg hidden !items-start md:!items-center">
+  <div class="modal-box rounded-b-2xl md:rounded-2xl animate-pop-in" style="margin-top:env(safe-area-inset-top);">
+    <div class="flex items-center gap-2 px-3" style="height:54px;border-bottom:1px solid var(--line);">
+      <span class="w-4 h-4 shrink-0" style="color:var(--faint)" id="paletteSearchIco"></span>
+      <input id="paletteInput" class="flex-1 bg-transparent outline-none text-[15px]" style="color:var(--ink);" placeholder="Search commands, files, projects…" />
+      <button class="btn-icon-sm" data-action="close-modal" data-modal="modalPalette"></button>
+    </div>
+    <div id="paletteList" class="max-h-[60vh] overflow-y-auto thin-scroll p-2"></div>
+  </div>
+</div>
+
+<!-- Prompt -->
+<div id="modalPrompt" class="modal-bg hidden">
+  <div class="modal-box rounded-t-3xl md:rounded-2xl animate-sheet-up md:animate-pop-in">
+    <form id="promptForm" class="p-5">
+      <p id="promptTitle" class="text-[16px] font-semibold mb-3" style="color:var(--ink)">New project</p>
+      <input id="promptInput" class="input-field" maxlength="80" />
+      <p id="promptHint" class="text-[12px] mt-1.5" style="color:var(--faint)"></p>
+      <div class="flex gap-2 mt-4">
+        <button type="button" class="btn-secondary flex-1" data-action="close-modal" data-modal="modalPrompt">Cancel</button>
+        <button type="submit" class="btn-primary flex-1" id="promptSubmit">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div id="modalConfirm" class="modal-bg hidden">
+  <div class="modal-box rounded-t-3xl md:rounded-2xl animate-sheet-up md:animate-pop-in">
+    <div class="p-5">
+      <p id="confirmTitle" class="text-[16px] font-semibold mb-1.5" style="color:var(--ink)">Are you sure?</p>
+      <p id="confirmMsg" class="text-[13.5px] leading-relaxed" style="color:var(--muted)"></p>
+      <div class="flex gap-2 mt-5">
+        <button type="button" class="btn-secondary flex-1" data-action="close-modal" data-modal="modalConfirm">Cancel</button>
+        <button type="button" id="confirmOk" class="btn-danger flex-1" style="background:var(--danger);color:#fff;">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toastRoot"></div>
+
+<script>
+'use strict';
+
+/* ── Config ── */
+const STORE_KEY = 'forge-v1';
+const MAX_HIST  = 24;
+
+const MODELS = [
+  { id:'openai/gpt-oss-120b',       name:'GPT-OSS 120B',   tag:'Best reasoning' },
+  { id:'openai/gpt-oss-20b',        name:'GPT-OSS 20B',    tag:'Fast + capable' },
+  { id:'qwen/qwen3.6-27b',          name:'Qwen3.6 27B',    tag:'Top intelligence' },
+  { id:'llama-3.3-70b-versatile',   name:'Llama 3.3 70B',  tag:'Versatile' },
+  { id:'llama-3.1-8b-instant',      name:'Llama 3.1 8B',   tag:'Instant' }
+];
+
+const VIBES = {
+  architectural: { label:'Architectural Precision', blurb:'Systematic, well-structured.',      prompt:'Adopt an Architectural Precision approach: think through structure first, favor clear separation of concerns, descriptive naming, organized files. Briefly explain key decisions before the code. Prioritize correctness and maintainability.' },
+  cybernetic:    { label:'Cybernetic Flow',          blurb:'Fast, momentum-driven.',            prompt:'Adopt a Cybernetic Flow approach: move fast, ship working code with minimal preamble, iterate in tight loops, favor pragmatic solutions over lengthy explanations. Keep commentary terse and energetic.' },
+  minimalist:    { label:'Minimalist Mastery',       blurb:'Lean, elegant, zero bloat.',        prompt:'Adopt a Minimalist Mastery approach: write the leanest code that fully solves the problem, avoid unnecessary abstraction or dependencies, prefer native platform capabilities. Every line earns its place.' },
+  custom:        { label:'Custom',                   blurb:'Define your own vibe.',             prompt:'' }
+};
+
+const BASE_SYS = `You are Forge Code, a senior AI coding assistant. Write complete, production-quality code.
+
+When you create or modify a file, output its FULL content using exactly this format:
+=== FILE: filename.ext ===
+<complete file content>
+=== END FILE ===
+
+You may include multiple FILE blocks. Always output FULL file content—never partial diffs or placeholders. Keep explanations outside FILE blocks, concise and skimmable.`;
+
+/* ── SVG Icons ── */
+const I = {
+  spark:       `<svg viewBox="0 0 24 24" fill="currentColor" class="ic"><path d="M12 2 14 9 21 12 14 15 12 22 10 15 3 12 10 9Z"/></svg>`,
+  chat:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ic"><rect x="3" y="5" width="18" height="13" rx="3.5"/><path d="M8 21v-3h4"/></svg>`,
+  folder:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ic"><path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V17a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>`,
+  box:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="ic"><path d="M12 3L21 7.5V16.5L12 21L3 16.5V7.5Z"/><path d="M3 7.5L12 12L21 7.5"/><line x1="12" y1="12" x2="12" y2="21"/></svg>`,
+  sliders:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><line x1="4" y1="7" x2="20" y2="7"/><circle cx="14" cy="7" r="2.2" fill="currentColor"/><line x1="4" y1="14" x2="20" y2="14"/><circle cx="8" cy="14" r="2.2" fill="currentColor"/><line x1="4" y1="21" x2="20" y2="21"/><circle cx="16" cy="21" r="2.2" fill="currentColor"/></svg>`,
+  sun:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><circle cx="12" cy="12" r="4.2"/><line x1="12" y1="2" x2="12" y2="4.5"/><line x1="12" y1="19.5" x2="12" y2="22"/><line x1="2" y1="12" x2="4.5" y2="12"/><line x1="19.5" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.6" y2="6.6"/><line x1="17.4" y1="17.4" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.6" y2="17.4"/><line x1="17.4" y1="6.6" x2="19.1" y2="4.9"/></svg>`,
+  moon:        `<svg viewBox="0 0 24 24" class="ic"><circle cx="12" cy="12" r="8" fill="currentColor"/><circle cx="16" cy="9" r="7" fill="var(--s2)"/></svg>`,
+  monitor:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><rect x="3" y="4" width="18" height="12" rx="2"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="12" y1="16" x2="12" y2="20"/></svg>`,
+  send:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" class="ic"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`,
+  plus:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="ic"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  x:           `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="ic"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  back:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" class="ic"><polyline points="15 18 9 12 15 6"/></svg>`,
+  copy:        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V6A2 2 0 0013.5 4H6a2 2 0 00-2 2v7.5a2 2 0 002 2H8.5"/></svg>`,
+  download:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><line x1="12" y1="3" x2="12" y2="15"/><polyline points="7 10 12 15 17 10"/><line x1="5" y1="19" x2="19" y2="19"/></svg>`,
+  trash:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><line x1="4" y1="7" x2="20" y2="7"/><path d="M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/><path d="M9 7V4.5A1.5 1.5 0 0110.5 3h3A1.5 1.5 0 0115 4.5V7"/></svg>`,
+  pencil:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><path d="M4 20l1-4.2L15.8 5 19 8.2 8.2 19 4 20z"/><line x1="13.5" y1="6.5" x2="17.5" y2="10.5"/></svg>`,
+  search:      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="ic"><circle cx="11" cy="11" r="7.5"/><line x1="21" y1="21" x2="16.2" y2="16.2"/></svg>`,
+  play:        `<svg viewBox="0 0 24 24" fill="currentColor" class="ic"><polygon points="6 3 21 12 6 21 6 3"/></svg>`,
+  check:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="ic"><polyline points="20 6 9 17 4 12"/></svg>`,
+  alert:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="ic"><circle cx="12" cy="12" r="9.2"/><line x1="12" y1="7.5" x2="12" y2="12.5"/><circle cx="12" cy="16.2" r=".8" fill="currentColor" stroke="none"/></svg>`,
+  key:         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><circle cx="8" cy="15.5" r="4.5"/><line x1="11.2" y1="12.3" x2="20.5" y2="3"/><line x1="16.5" y1="7" x2="19" y2="9.5"/></svg>`,
+  refresh:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="ic"><path d="M21 12a9 9 0 11-3.2-6.9"/><polyline points="21 3 21 9 15 9"/></svg>`,
+  extlink:     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" class="ic"><path d="M14 4h6v6"/><line x1="20" y1="4" x2="10" y2="14"/><path d="M19 13.5V19a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2h5.5"/></svg>`,
+  chevR:       `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" class="ic"><polyline points="9 6 15 12 9 18"/></svg>`
+};
+function ico(name, cls) { return `<span class="${cls||'w-5 h-5'} inline-block" style="flex-shrink:0;">${I[name]||''}</span>`; }
+
+/* ── Utilities ── */
+const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const esc  = s  => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clamp= (n,a,b) => Math.max(a,Math.min(b,n));
+const $    = id => document.getElementById(id);
+
+function timeAgo(ts) {
+  const s = Math.floor((Date.now()-ts)/1000);
+  if (s<10) return 'just now'; if (s<60) return s+'s ago';
+  const m=Math.floor(s/60); if (m<60) return m+'m ago';
+  const h=Math.floor(m/60); if (h<24) return h+'h ago';
+  return Math.floor(h/24)+'d ago';
+}
+function detectLang(fn) {
+  const e=(fn.split('.').pop()||'').toLowerCase();
+  return {html:'html',htm:'html',css:'css',js:'javascript',mjs:'javascript',jsx:'jsx',ts:'typescript',tsx:'tsx',json:'json',py:'python',md:'markdown',sh:'bash',yml:'yaml',yaml:'yaml',sql:'sql',txt:'text',svg:'xml',xml:'xml'}[e]||'text';
+}
+function fileColor(fn) {
+  return {html:'var(--ember)',css:'var(--steel)',javascript:'#E8C547',jsx:'#E8C547',typescript:'var(--steel)',tsx:'var(--steel)',json:'var(--faint)',python:'var(--steel)',markdown:'var(--success)'}[detectLang(fn)]||'var(--faint)';
+}
+function mimeFor(fn) {
+  return ({html:'text/html',css:'text/css',javascript:'text/javascript',json:'application/json',markdown:'text/markdown',xml:'application/xml'}[detectLang(fn)]||'text/plain')+';charset=utf-8';
+}
+function dlText(name, content, mime) {
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type:mime||'text/plain'})); a.download=name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+async function cpText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch(e) {}
+  const t=document.createElement('textarea'); t.value=text; t.style.position='fixed'; t.style.opacity='0';
+  document.body.appendChild(t); t.select(); try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(t); return true;
+}
+
+/* ── Store ── */
+const defaultSettings = () => ({ apiKey:'', theme:'dark', model:MODELS[0].id, vibe:'architectural', customVibe:'', temperature:0.6 });
+const defaultStore    = () => ({ settings:defaultSettings(), projects:[], currentId:null });
+
+function loadStore() {
+  try {
+    const r = localStorage.getItem(STORE_KEY); if (!r) return defaultStore();
+    const p = JSON.parse(r);
+    const s = defaultStore();
+    s.settings = Object.assign(defaultSettings(), p.settings||{});
+    s.projects  = (p.projects||[]).map(pr => ({ ...pr, files:pr.files||{}, fileOrder:pr.fileOrder||Object.keys(pr.files||{}), messages:pr.messages||[] }));
+    s.currentId = p.currentId || (s.projects[0]&&s.projects[0].id) || null;
+    return s;
+  } catch(e) { return defaultStore(); }
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch(e) { toast('Storage full — could not save','error'); } }
+function newProj(name) { return { id:uid(), name:(name||'Untitled').trim()||'Untitled', createdAt:Date.now(), updatedAt:Date.now(), messages:[], files:{}, fileOrder:[] }; }
+function curProj()     { return store.projects.find(p=>p.id===store.currentId)||null; }
+function touch(p)      { p.updatedAt=Date.now(); }
+
+let store = loadStore();
+
+/* ── UI State ── */
+const ui = {
+  view: 'chat',          // chat | files | projects | settings
+  fileOpen: null,
+  edMode: 'edit',
+  sending: false,
+  abort: null,
+  promptRes: null,
+  confirmRes: null,
+};
+
+/* ── Toast ── */
+function toast(msg, type, dur) {
+  type=type||'info'; dur=dur||3000;
+  const iconMap = { success:'check', error:'alert', warn:'alert', info:'check' };
+  const el=document.createElement('div');
+  el.className=`toast-el toast-${type}`;
+  el.innerHTML=`<span class="w-4 h-4 shrink-0">${I[iconMap[type]]||''}</span><span>${esc(msg)}</span>`;
+  $('toastRoot').appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, dur);
+}
+
+/* ── Modal helpers ── */
+const showM = id => $(id).classList.remove('hidden');
+const hideM = id => $(id).classList.add('hidden');
+
+function promptModal({title,placeholder,value,hint,submit}) {
+  return new Promise(res => {
+    $('promptTitle').textContent = title||'Enter name';
+    $('promptInput').placeholder = placeholder||'';
+    $('promptInput').value = value||'';
+    $('promptHint').textContent = hint||'';
+    $('promptSubmit').textContent = submit||'Create';
+    ui.promptRes=res; showM('modalPrompt');
+    setTimeout(()=>{ $('promptInput').focus(); $('promptInput').select(); }, 60);
+  });
+}
+function confirmModal({title,msg,ok}) {
+  return new Promise(res => {
+    $('confirmTitle').textContent = title||'Are you sure?';
+    $('confirmMsg').textContent   = msg||'';
+    $('confirmOk').textContent    = ok||'Delete';
+    ui.confirmRes=res; showM('modalConfirm');
+  });
+}
+
+/* ── Icon injection ── */
+function paintIcons() {
+  const set = (id,n,cls) => { const el=$(id); if(el){ el.innerHTML=''; el.insertAdjacentHTML('beforeend',`<span class="${cls||'w-5 h-5'} inline-block">${I[n]||''}</span>`); }};
+  [['sidebarLogo','spark','w-6 h-6'],['topLogo','spark','w-[22px] h-[22px]'],['sbPlusIco','plus','w-4 h-4'],
+   ['sbSettingsBtn','sliders'],['sbThemeBtn','sun'],['sbPaletteBtn','search'],['sbPreviewBtn','play'],
+   ['topPaletteBtn','search'],['chatCmdBtn','search'],['sendIco','send','w-[18px] h-[18px]'],
+   ['tabIcoChat','chat','w-[22px] h-[22px]'],['tabIcoProjects','box','w-[22px] h-[22px]'],
+   ['tabIcoSettings','sliders','w-[22px] h-[22px]'],
+   ['sheetFilesNew','plus'],['sheetProjectsNew','plus'],
+   ['fileMClose','x'],['fileMCopy','copy'],['fileMDown','download'],['fileMDel','trash','w-[18px] h-[18px]'],
+   ['previewClose','x'],['previewRefresh','refresh'],['previewTab','extlink'],['previewEmptyIco','box','w-10 h-10'],
+   ['qpClose','x'],['paletteSearchIco','search','w-4 h-4'],['settingsBackBtn','back']
+  ].forEach(([id,n,cls])=>set(id,n,cls));
+
+  // folder icon needs badge preserved
+  const fi=$('tabIcoFiles'); if(fi&&!fi.querySelector('svg')){ fi.insertAdjacentHTML('afterbegin',`<span class="w-[22px] h-[22px] inline-block">${I.folder}</span>`); }
+}
+
+function renderThemeIcon() {
+  const t=store.settings.theme;
+  const n=t==='dark'?'moon':t==='light'?'sun':'monitor';
+  const btn=$('sbThemeBtn'); if(btn){ btn.innerHTML=''; btn.insertAdjacentHTML('beforeend',ico(n)); }
+}
+
+/* ── FILE block parser ── */
+function extractFiles(raw) {
+  const re = /===\s*FILE:\s*([^\n=]+?)\s*===\r?\n([\s\S]*?)(?=\r?\n===\s*FILE:|\r?\n===\s*END\s*FILE\s*===|$)/gi;
+  const files=[]; const spans=[];
+  let m;
+  while((m=re.exec(raw))){ 
+    let body=m[2].replace(/\r?\n?===\s*END\s*FILE\s*===\s*$/i,'').replace(/^\n+/,'').trimEnd();
+    files.push({filename:m[1].trim(), content:body+'\n'});
+    spans.push([m.index, m.index+m[0].length]);
+  }
+  let cleaned='', cursor=0;
+  spans.forEach(([s,e])=>{ cleaned+=raw.slice(cursor,s); cursor=e; });
+  cleaned += raw.slice(cursor);
+  cleaned = cleaned.replace(/===\s*END\s*FILE\s*===/gi,'').replace(/\n{3,}/g,'\n\n').trim();
+  return {files, cleanedText:cleaned};
+}
+
+/* ── Syntax highlight (simulated) ── */
+function hlCode(escaped) {
+  let o=escaped;
+  o=o.replace(/(^|\n)([ \t]*(?:\/\/|#).*)/g, (_,p,c)=>p+`<span class="tok-cmt">${c}</span>`);
+  o=o.replace(/(&quot;[^&\n]*?&quot;|&#39;[^&\n]*?&#39;)/g, `<span class="tok-str">$1</span>`);
+  o=o.replace(/\b(function|const|let|var|return|if|else|for|while|class|import|export|default|from|new|this|async|await|try|catch|finally|switch|case|break|continue|null|undefined|true|false|None|self|def|public|private|static|void|interface|type|extends|implements|throw|yield|of|in)\b/g, `<span class="tok-kw">$1</span>`);
+  o=o.replace(/\b(\d+\.?\d*)\b/g, `<span class="tok-num">$1</span>`);
+  return o;
+}
+
+/* ── Markdown renderer ── */
+function mdLite(text) {
+  if(!text) return '';
+  let h=esc(text);
+  h=h.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_,lang,code)=>{
+    const id='cb_'+uid();
+    return `<div class="code-wrap"><div class="code-head"><span>${esc(lang||'code')}</span><button type="button" data-action="copy-code" data-target="${id}" style="color:var(--faint);display:flex;align-items:center;gap:4px;font-size:11px;">${ico('copy','w-[13px] h-[13px]')}Copy</button></div><pre class="code-body"><code id="${id}">${hlCode(code)}</code></pre></div>`;
+  });
+  h=h.replace(/`([^`\n]+)`/g,'<code class="ikc">$1</code>');
+  h=h.replace(/\*\*([^*\n]+)\*\*/g,'<strong>$1</strong>');
+  h=h.replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
+  h=h.replace(/(^|\n)((?:[ \t]*[-•]\s.+(?:\n|$))+)/g, (_,p,list)=>
+    p+'<ul>'+list.trim().split('\n').map(l=>'<li>'+l.replace(/^[ \t]*[-•]\s/,'')+'</li>').join('')+'</ul>'
+  );
+  h=h.split(/\n{2,}/).map(p=>{
+    if(/^<div class="code-wrap"/.test(p)||/^<ul/.test(p)) return p;
+    return p.trim()?'<p>'+p.replace(/\n/g,'<br>')+'</p>':'';
+  }).join('');
+  return h;
+}
+
+/* ── System prompt ── */
+function buildSys(project) {
+  const vk=store.settings.vibe, vibe=VIBES[vk]||VIBES.architectural;
+  const vt = vk==='custom'?(store.settings.customVibe.trim()||'Respond naturally.'): vibe.prompt;
+  let fb='';
+  const names=(project.fileOrder.length?project.fileOrder:Object.keys(project.files)).filter(n=>project.files[n]!=null);
+  if(names.length) {
+    fb='\n\nCurrent project files:\n'+names.map(n=>{
+      let c=project.files[n]||''; if(c.length>4000) c=c.slice(0,4000)+'\n…[truncated]';
+      return `=== FILE: ${n} ===\n${c}\n=== END FILE ===`;
+    }).join('\n\n');
+  }
+  return BASE_SYS+'\n\n'+vt+fb;
+}
+
+/* ── Theme ── */
+function applyTheme() {
+  const sys=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const t=store.settings.theme;
+  const dark=t==='system'?sys:t==='dark';
+  document.documentElement.classList.toggle('dark',dark);
+  document.documentElement.classList.toggle('light',!dark);
+  const m=$('metaThemeColor'); if(m) m.content=dark?'#0A0B0D':'#F5F5F3';
+  renderThemeIcon();
+}
+function setTheme(t){ store.settings.theme=t; save(); applyTheme(); }
+function cycleTheme(){ const o=['dark','light','system']; setTheme(o[(o.indexOf(store.settings.theme)+1)%3]); toast(store.settings.theme+' theme','info',1600); }
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{ if(store.settings.theme==='system') applyTheme(); });
+
+/* ── Chat rendering ── */
+function avatarHtml() {
+  return `<div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5" style="background:color-mix(in srgb,var(--ember) 14%,var(--s1));"><span class="w-3.5 h-3.5">${I.spark}</span></div>`;
+}
+function fileChipHtml(filename) {
+  return `<button type="button" data-action="open-file" data-name="${esc(filename)}" class="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors" style="background:var(--s1);border:1px solid var(--line);min-height:44px;">
+    <span class="w-2 h-2 rounded-full shrink-0" style="background:${fileColor(filename)}"></span>
+    <span class="flex-1 min-w-0 truncate text-[13.5px] font-medium" style="color:var(--ink)">${esc(filename)}</span>
+    <span class="text-[10px] uppercase tracking-wide shrink-0" style="color:var(--faint)">${esc(detectLang(filename))}</span>
+    <span class="w-4 h-4 shrink-0" style="color:var(--faint)">${I.chevR}</span>
+  </button>`;
+}
+function emptyHtml() {
+  const chips=['Build a landing page','Write a REST API in Node','Refactor this code','Add dark mode'].map(s=>
+    `<button type="button" data-action="use-suggestion" data-text="${esc(s)}" class="px-4 py-2.5 rounded-full text-[13px] font-medium" style="background:var(--s2);border:1px solid var(--line);color:var(--muted);">${esc(s)}</button>`
+  ).join('');
+  return `<div class="flex flex-col items-center justify-center text-center px-6 py-14 gap-4">
+    <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:color-mix(in srgb,var(--ember) 12%,var(--s1));border:1px solid var(--line);">
+      <span class="w-7 h-7" style="color:var(--ember)">${I.spark}</span>
+    </div>
+    <div>
+      <p class="text-[18px] font-bold" style="color:var(--ink)">Start forging</p>
+      <p class="text-[13.5px] mt-1.5 max-w-xs leading-relaxed" style="color:var(--muted)">Describe what you want to build. Forge writes complete files and drops them right in.</p>
+    </div>
+    <div class="flex flex-wrap gap-2 justify-center max-w-sm">${chips}</div>
+  </div>`;
+}
+function noKeyHtml() {
+  return `<div class="mx-auto max-w-sm my-2 rounded-xl px-4 py-3 text-center" style="background:color-mix(in srgb,var(--ember) 9%,var(--s1));border:1px solid var(--line);">
+    <p class="text-[12.5px] font-medium" style="color:var(--ink)">Add your Groq API key to start</p>
+    <button type="button" data-action="set-view" data-view="settings" class="text-[12.5px] font-semibold mt-1 block mx-auto" style="color:var(--ember)">Open settings →</button>
+  </div>`;
+}
+
+function renderMsgHtml(msg) {
+  if(msg.role==='user') {
+    return `<div class="flex justify-end mb-4 animate-fade-up" data-mid="${msg.id}">
+      <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-br-sm px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words" style="background:var(--ember);color:#fff;">${esc(msg.content)}</div>
+    </div>`;
+  }
+  if(msg.streaming && !msg.content) {
+    return `<div class="flex gap-2.5 mb-4 animate-fade-up" data-mid="${msg.id}">
+      ${avatarHtml()}
+      <div class="rounded-2xl rounded-bl-sm px-4 py-3.5" style="background:var(--s2);border:1px solid var(--line);">
+        <div class="flex items-center gap-1.5">
+          <span class="forging-dot"></span>
+          <span class="forging-dot" style="animation-delay:.15s"></span>
+          <span class="forging-dot" style="animation-delay:.3s"></span>
+          <span class="text-[12px] ml-1.5" style="color:var(--muted)">Forging…</span>
+        </div>
+      </div>
+    </div>`;
+  }
+  if(msg.streaming) {
+    return `<div class="flex gap-2.5 mb-4" data-mid="${msg.id}">
+      ${avatarHtml()}
+      <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-bl-sm px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap break-words" style="background:var(--s2);border:1px solid var(--line);">${esc(msg.content)}<span style="display:inline-block;width:2px;height:1em;background:var(--ember);margin-left:2px;vertical-align:-2px;animation:pulse2 .8s step-end infinite;"></span></div>
+    </div>`;
+  }
+  const parsed = msg._parsed || (msg._parsed=extractFiles(msg.content));
+  const body = mdLite(parsed.cleanedText || (parsed.files.length?'':msg.content));
+  const chips = parsed.files.map(f=>fileChipHtml(f.filename)).join('');
+  return `<div class="flex gap-2.5 mb-5 group" data-mid="${msg.id}">
+    ${avatarHtml()}
+    <div class="flex-1 min-w-0 max-w-[85%] md:max-w-[70%]">
+      <div class="rounded-2xl rounded-bl-sm px-4 py-3 text-[15px] leading-relaxed break-words msg-prose" style="background:var(--s2);border:1px solid ${msg.error?'var(--danger)':'var(--line)'};">
+        ${body||(parsed.files.length?'':'<p style="opacity:.5;font-style:italic">No response</p>')}
+        ${chips?`<div class="mt-2 space-y-1.5">${chips}</div>`:''}
+      </div>
+      <div class="flex items-center gap-3 mt-1.5 px-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+        <button type="button" data-action="copy-msg" data-id="${msg.id}" class="flex items-center gap-1 text-[11.5px] font-medium transition-colors" style="color:var(--faint);" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--faint)'">${ico('copy','w-[13px] h-[13px]')} Copy</button>
+        ${msg.error?`<button type="button" data-action="retry-msg" data-id="${msg.id}" class="flex items-center gap-1 text-[11.5px] font-medium" style="color:var(--faint);" onmouseover="this.style.color='var(--ink)'" onmouseout="this.style.color='var(--faint)'">${ico('refresh','w-[13px] h-[13px]')} Retry</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function scrollBottom(force) {
+  const el=$('chatScroll'); if(!el) return;
+  if(force || el.scrollHeight-el.scrollTop-el.clientHeight<180) el.scrollTop=el.scrollHeight;
+}
+
+function renderChat() {
+  const p=curProj(), container=$('chatMessages');
+  if(!p) {
+    container.innerHTML=`<div class="flex flex-col items-center justify-center text-center px-6 py-16 gap-4">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:var(--s1);border:1px solid var(--line);">${ico('spark','w-7 h-7')}</div>
+      <p class="text-[17px] font-semibold" style="color:var(--ink)">No project</p>
+      <p class="text-[13.5px]" style="color:var(--muted)">Create a project to begin.</p>
+      <button class="btn-primary" data-action="new-project">${ico('plus','w-4 h-4')} New project</button>
+    </div>`; return;
+  }
+  if(!p.messages.length) { container.innerHTML=emptyHtml()+(store.settings.apiKey?'':noKeyHtml()); return; }
+  container.innerHTML=p.messages.map(renderMsgHtml).join('')+(store.settings.apiKey?'':noKeyHtml());
+}
+
+function updateBubble(msg) {
+  const el=document.querySelector(`[data-mid="${msg.id}"]`);
+  if(!el){ renderChat(); scrollBottom(); return; }
+  el.outerHTML=renderMsgHtml(msg); scrollBottom();
+}
+
+/* ── Files / Projects lists ── */
+function filesHtml() {
+  const p=curProj();
+  if(!p) return `<p class="text-center py-10 text-[13px]" style="color:var(--faint)">No project</p>`;
+  const names=(p.fileOrder||[]).filter(n=>p.files[n]!=null);
+  if(!names.length) return `<div class="flex flex-col items-center text-center gap-3 py-14 px-6">
+    ${ico('folder','w-9 h-9')}
+    <p class="text-[14px] font-semibold" style="color:var(--ink)">No files yet</p>
+    <p class="text-[13px]" style="color:var(--muted)">Forge-generated files appear here.</p>
+    <button type="button" class="btn-secondary !py-2 !px-3 text-[13px]" data-action="new-file">${ico('plus','w-4 h-4')} New file</button>
+  </div>`;
+  return names.map(n=>{
+    const lines=(p.files[n]||'').split('\n').length;
+    return `<div class="row-item${ui.fileOpen===n?' active':''}" data-action="open-file" data-name="${esc(n)}">
+      <span class="w-2 h-2 rounded-full shrink-0" style="background:${fileColor(n)}"></span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[13.5px] font-medium truncate" style="color:var(--ink)">${esc(n)}</p>
+        <p class="text-[11px]" style="color:var(--faint)">${lines} lines · ${esc(detectLang(n))}</p>
+      </div>
+      ${ico('chevR','w-4 h-4')}
+    </div>`;
+  }).join('');
+}
+function renderFiles() {
+  const h=filesHtml();
+  ['sbFilesList','sheetFilesList'].forEach(id=>{ const el=$(id); if(el) el.innerHTML=h; });
+  const p=curProj(); const count=p?(p.fileOrder||[]).filter(n=>p.files[n]!=null).length:0;
+  const b=$('filesBadge'); if(b){ if(count){ b.textContent=count>9?'9+':String(count); b.classList.remove('hidden'); } else b.classList.add('hidden'); }
+}
+
+function projectsHtml() {
+  if(!store.projects.length) return `<div class="flex flex-col items-center text-center gap-3 py-14 px-6">
+    ${ico('box','w-9 h-9')}
+    <p class="text-[14px] font-semibold" style="color:var(--ink)">No projects</p>
+    <button type="button" class="btn-primary !py-2 !px-3 text-[13px]" data-action="new-project">${ico('plus','w-4 h-4')} New project</button>
+  </div>`;
+  return [...store.projects].sort((a,b)=>b.updatedAt-a.updatedAt).map(p=>{
+    const active=p.id===store.currentId;
+    const fc=(p.fileOrder||[]).filter(n=>p.files[n]!=null).length;
+    return `<div class="row-item${active?' active':''}" data-action="switch-project" data-id="${p.id}">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background:${active?'color-mix(in srgb,var(--ember) 14%,var(--s1))':'var(--s2)'};">
+        <span class="w-4 h-4" style="color:${active?'var(--ember)':'var(--faint)'}">${I.box}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-[13.5px] font-medium truncate" style="color:var(--ink)">${esc(p.name)}</p>
+        <p class="text-[11px]" style="color:var(--faint)">${fc} files · ${timeAgo(p.updatedAt)}</p>
+      </div>
+      <button type="button" class="btn-icon-sm" data-action="rename-project" data-id="${p.id}">${ico('pencil','w-4 h-4')}</button>
+      <button type="button" class="btn-icon-sm" data-action="delete-project" data-id="${p.id}" style="color:var(--danger)">${ico('trash','w-4 h-4')}</button>
+    </div>`;
+  }).join('');
+}
+function renderProjects() {
+  const h=projectsHtml();
+  ['sbProjectsList','sheetProjectsList'].forEach(id=>{ const el=$(id); if(el) el.innerHTML=h; });
+}
+
+/* ── Topbar pills ── */
+function renderTopbar() {
+  const p=curProj();
+  const name=p?p.name:'Forge Code';
+  const t=$('topTitle'); if(t) t.textContent=name;
+  const sub=$('topSub'); if(sub) sub.textContent=p?`${(p.fileOrder||[]).filter(n=>p.files[n]!=null).length} files · ${p.messages.length} messages`:'AI coding assistant';
+  const m=MODELS.find(x=>x.id===store.settings.model)||MODELS[0];
+  const v=VIBES[store.settings.vibe]||VIBES.architectural;
+  const ml=ico('box','w-3.5 h-3.5')+`<span>${esc(m.name)}</span>`;
+  const vl=ico('sliders','w-3.5 h-3.5')+`<span>${esc(v.label)}</span>`;
+  ['modelPillD','modelPillM'].forEach(id=>{ const el=$(id); if(el) el.innerHTML=ml; });
+  ['vibePillD','vibePillM'].forEach(id=>{ const el=$(id); if(el) el.innerHTML=vl; });
+}
+
+/* ── Settings HTML ── */
+function settingsHtml() {
+  const s=store.settings;
+  return `<div class="max-w-lg mx-auto px-4 py-5 space-y-7">
+  <section>
+    <p class="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style="color:var(--faint)">Groq API key</p>
+    <div class="rounded-2xl p-4" style="background:var(--s1);border:1px solid var(--line);">
+      <div class="flex items-center gap-2">
+        ${ico('key','w-4 h-4')}
+        <input id="apiKeyInput" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_…" value="${esc(s.apiKey)}" class="flex-1 bg-transparent outline-none font-mono" style="color:var(--ink);font-size:15px;" />
+        <button type="button" data-action="toggle-key" class="text-[12px] font-semibold shrink-0" style="color:var(--steel)">Show</button>
+      </div>
+      <p class="text-[11.5px] mt-2.5 leading-relaxed" style="color:var(--faint)">Stored only on this device. Get a free key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="underline" style="color:var(--steel)">console.groq.com</a>.</p>
+    </div>
+  </section>
+  <section>
+    <p class="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style="color:var(--faint)">Model</p>
+    <div class="rounded-2xl overflow-hidden" style="background:var(--s1);border:1px solid var(--line);">
+      ${MODELS.map((m,i)=>`<button type="button" class="row-item w-full !rounded-none ${m.id===s.model?'active':''}" style="${i?'border-top:1px solid var(--line);':''}" data-action="select-model" data-id="${m.id}">
+        <div class="flex-1 min-w-0 text-left"><p class="text-[13.5px] font-medium" style="color:var(--ink)">${esc(m.name)}</p><p class="text-[11.5px]" style="color:var(--faint)">${esc(m.tag)}</p></div>
+        ${m.id===s.model?ico('check','w-4 h-4'):''}
+      </button>`).join('')}
+    </div>
+  </section>
+  <section>
+    <p class="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style="color:var(--faint)">Vibe</p>
+    <div class="space-y-2">
+      ${Object.keys(VIBES).filter(k=>k!=='custom').map(k=>`<button type="button" class="row-item w-full ${k===s.vibe?'active':''}" style="background:var(--s1);border:1px solid var(--line);" data-action="select-vibe" data-id="${k}">
+        <div class="flex-1 text-left"><p class="text-[13.5px] font-medium" style="color:var(--ink)">${esc(VIBES[k].label)}</p><p class="text-[11.5px]" style="color:var(--faint)">${esc(VIBES[k].blurb)}</p></div>
+        ${k===s.vibe?ico('check','w-4 h-4'):''}
+      </button>`).join('')}
+      <button type="button" class="row-item w-full ${s.vibe==='custom'?'active':''}" style="background:var(--s1);border:1px solid var(--line);" data-action="select-vibe" data-id="custom">
+        <div class="flex-1 text-left"><p class="text-[13.5px] font-medium" style="color:var(--ink)">Custom</p><p class="text-[11.5px]" style="color:var(--faint)">Define your own style</p></div>
+        ${s.vibe==='custom'?ico('check','w-4 h-4'):''}
+      </button>
+      ${s.vibe==='custom'?`<textarea id="customVibeInput" rows="3" placeholder="e.g. Explain everything step by step…" class="input-field text-[13.5px]">${esc(s.customVibe)}</textarea>`:''}
+    </div>
+  </section>
+  <section>
+    <p class="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style="color:var(--faint)">Creativity</p>
+    <div class="rounded-2xl p-4" style="background:var(--s1);border:1px solid var(--line);">
+      <div class="flex justify-between mb-2"><label class="text-[13px] font-medium" style="color:var(--ink)">Temperature</label><span id="tempVal" class="text-[13px] font-mono" style="color:var(--muted)">${s.temperature.toFixed(2)}</span></div>
+      <input id="tempInput" type="range" min="0" max="1" step="0.05" value="${s.temperature}" class="forge-range" />
+      <div class="flex justify-between text-[10.5px] mt-1" style="color:var(--faint)"><span>Precise</span><span>Inventive</span></div>
+    </div>
+  </section>
+  <section>
+    <p class="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style="color:var(--faint)">Appearance</p>
+    <div class="flex rounded-xl p-1 gap-1" style="background:var(--s1);border:1px solid var(--line);">
+      ${['dark','light','system'].map(t=>`<button type="button" data-action="set-theme" data-theme="${t}" class="flex-1 py-2 rounded-lg text-[13px] font-medium capitalize transition-colors" style="${s.theme===t?'background:var(--s3);color:var(--ink);':'color:var(--faint);'}">${t}</button>`).join('')}
+    </div>
+  </section>
+  <section>
+    <p class="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style="color:var(--faint)">Data</p>
+    <div class="rounded-2xl overflow-hidden" style="background:var(--s1);border:1px solid var(--line);">
+      <button type="button" class="row-item w-full !rounded-none" data-action="export-project">${ico('download','w-4 h-4')}<span class="flex-1 text-left text-[13.5px] font-medium" style="color:var(--ink)">Export current project</span></button>
+      <button type="button" class="row-item w-full !rounded-none" style="border-top:1px solid var(--line);" data-action="export-backup">${ico('box','w-4 h-4')}<span class="flex-1 text-left text-[13.5px] font-medium" style="color:var(--ink)">Export full backup</span></button>
+      <button type="button" class="row-item w-full !rounded-none" style="border-top:1px solid var(--line);" data-action="clear-data">${ico('trash','w-4 h-4')}<span class="flex-1 text-left text-[13.5px] font-medium" style="color:var(--danger)">Clear all data</span></button>
+    </div>
+  </section>
+  <p class="text-center text-[11.5px] pb-4" style="color:var(--faint)">Forge Code · powered by Groq</p>
+</div>`;
+}
+function renderSettings() { const b=$('settingsBody'); if(b) b.innerHTML=settingsHtml(); }
+
+/* ── View switching ── */
+function setView(view) {
+  ui.view=view;
+  // Tab bar active state
+  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===view));
+  // Hide all mobile sheets
+  ['sheetFiles','sheetProjects'].forEach(id=>$(id).classList.add('hidden'));
+  // Desktop: show/hide settings vs chat column
+  const chat=$('viewChat'), sett=$('viewSettings');
+  if(view==='settings') {
+    renderSettings();
+    chat.classList.add('hidden'); chat.classList.remove('flex');
+    sett.classList.remove('hidden'); sett.classList.add('flex');
+  } else {
+    sett.classList.add('hidden'); sett.classList.remove('flex');
+    chat.classList.remove('hidden'); chat.classList.add('flex');
+  }
+  // Mobile sheets
+  if(view==='files')    { renderFiles();    $('sheetFiles').classList.remove('hidden'); }
+  if(view==='projects') { renderProjects(); $('sheetProjects').classList.remove('hidden'); }
+}
+
+/* ── Quick-pick (model / vibe) ── */
+function openQP(kind) {
+  const isM=kind==='model';
+  $('qpTitle').textContent=isM?'Choose a model':'Choose a vibe';
+  const items=isM?MODELS.map(m=>({id:m.id,name:m.name,sub:m.tag,active:m.id===store.settings.model}))
+                  :Object.keys(VIBES).map(k=>({id:k,name:VIBES[k].label,sub:VIBES[k].blurb,active:k===store.settings.vibe}));
+  $('qpList').innerHTML=items.map(it=>`<button type="button" class="row-item w-full ${it.active?'active':''}" data-action="${isM?'select-model':'select-vibe'}" data-id="${it.id}" data-close="qp">
+    <div class="flex-1 min-w-0 text-left"><p class="text-[13.5px] font-medium" style="color:var(--ink)">${esc(it.name)}</p><p class="text-[11.5px]" style="color:var(--faint)">${esc(it.sub)}</p></div>
+    ${it.active?ico('check','w-4 h-4'):''}
+  </button>`).join('');
+  showM('modalQP');
+}
+
+/* ── Command palette ── */
+function getCommands() {
+  const p=curProj();
+  const cmds=[
+    {id:'new-project',  label:'New project',       icon:'plus',    run:()=>actionNewProject()},
+    {id:'new-file',     label:'New file',           icon:'plus',    run:()=>actionNewFile()},
+    {id:'go-chat',      label:'Go to chat',         icon:'chat',    run:()=>setView('chat')},
+    {id:'go-files',     label:'View files',         icon:'folder',  run:()=>setView('files')},
+    {id:'go-projects',  label:'Switch project',     icon:'box',     run:()=>setView('projects')},
+    {id:'go-settings',  label:'Settings',           icon:'sliders', run:()=>setView('settings')},
+    {id:'preview',      label:'Live preview',       icon:'play',    run:()=>openPreview()},
+    {id:'theme',        label:'Toggle theme',       icon:'sun',     run:()=>cycleTheme()},
+    {id:'export',       label:'Export project',     icon:'download',run:()=>actionExport()},
+    {id:'clear-chat',   label:'Clear conversation', icon:'trash',   run:()=>actionClearChat()},
+  ];
+  if(p) {
+    (p.fileOrder||[]).filter(n=>p.files[n]!=null).forEach(f=>{
+      cmds.push({id:'f-'+f, label:'Open '+f, icon:'chevR', sub:'File', run:()=>openFileModal(f)});
+    });
+    store.projects.filter(x=>x.id!==p.id).slice(0,6).forEach(x=>{
+      cmds.push({id:'p-'+x.id, label:'Switch to '+x.name, icon:'box', sub:'Project', run:()=>switchProject(x.id)});
+    });
+  }
+  return cmds;
+}
+function renderPalette(q) {
+  const list=$('paletteList'); if(!list) return;
+  const cmds=getCommands().filter(c=>!q||c.label.toLowerCase().includes(q.toLowerCase()));
+  if(!cmds.length){ list.innerHTML=`<p class="text-center py-8 text-[13px]" style="color:var(--faint)">No matches</p>`; return; }
+  list.innerHTML=cmds.map((c,i)=>`<button type="button" class="row-item w-full ${i===0?'active':''}" data-cmd="${c.id}">
+    <span class="w-4 h-4 shrink-0" style="color:var(--faint)">${I[c.icon]||''}</span>
+    <span class="flex-1 text-left text-[13.5px] font-medium truncate" style="color:var(--ink)">${esc(c.label)}</span>
+    ${c.sub?`<span class="text-[11px] shrink-0" style="color:var(--faint)">${esc(c.sub)}</span>`:''}
+  </button>`).join('');
+  list.querySelectorAll('[data-cmd]').forEach(btn=>{
+    btn.addEventListener('click',()=>{ const c=cmds.find(x=>x.id===btn.dataset.cmd); hideM('modalPalette'); if(c) c.run(); });
+  });
+}
+function openPalette() { showM('modalPalette'); $('paletteInput').value=''; renderPalette(''); setTimeout(()=>$('paletteInput').focus(),60); }
+
+/* ── File editor ── */
+let saveTimer=null;
+function syncGutter() {
+  const ta=$('edTA'), g=$('edGutter'); if(!ta||!g) return;
+  const n=ta.value.split('\n').length;
+  g.textContent=Array.from({length:n},(_,i)=>i+1).join('\n');
+  g.style.minWidth=(String(n).length*8+20)+'px';
+  g.scrollTop=ta.scrollTop;
+}
+function openFileModal(name) {
+  const p=curProj(); if(!p||p.files[name]==null) return;
+  ui.fileOpen=name;
+  $('fileMName').value=name; $('fileMName').dataset.orig=name;
+  $('fileMlang').textContent=detectLang(name);
+  const c=p.files[name];
+  $('edTA').value=c;
+  $('fileMlines').textContent=c.split('\n').length+' lines';
+  setEdMode('edit');
+  syncGutter();
+  showM('modalFile');
+  renderFiles();
+}
+function setEdMode(mode) {
+  ui.edMode=mode;
+  const on='background:var(--s2);color:var(--ink);', off='color:var(--faint);';
+  $('edEditBtn').style.cssText=mode==='edit'?on:off;
+  $('edViewBtn').style.cssText=mode==='preview'?on:off;
+  if(mode==='preview'){
+    $('edPreviewCode').innerHTML=hlCode(esc($('edTA').value));
+    $('edEditWrap').classList.add('hidden');
+    $('edPreviewWrap').classList.remove('hidden');
+  } else {
+    $('edPreviewWrap').classList.add('hidden');
+    $('edEditWrap').classList.remove('hidden');
+    setTimeout(()=>$('edTA').focus(),30);
+  }
+}
+function commitEdit() {
+  const p=curProj(), n=ui.fileOpen; if(!p||!n||p.files[n]==null) return;
+  p.files[n]=$('edTA').value; touch(p); save();
+  const s=$('fileMsaved'); if(s){ s.style.opacity='1'; clearTimeout(s._t); s._t=setTimeout(()=>s.style.opacity='0',1400); }
+  renderFiles(); renderTopbar();
+}
+function renameFile(newName) {
+  const p=curProj(), old=$('fileMName').dataset.orig; newName=(newName||'').trim();
+  if(!p||!old||!newName||newName===old) return;
+  if(p.files[newName]!=null){ toast('File already exists','error'); $('fileMName').value=old; return; }
+  p.files[newName]=p.files[old]; delete p.files[old];
+  const i=p.fileOrder.indexOf(old); if(i>-1) p.fileOrder[i]=newName; else p.fileOrder.push(newName);
+  ui.fileOpen=newName; $('fileMName').dataset.orig=newName;
+  $('fileMlang').textContent=detectLang(newName);
+  touch(p); save(); renderFiles(); toast('Renamed','success',1600);
+}
+function closeFileModal() { hideM('modalFile'); ui.fileOpen=null; renderFiles(); }
+
+/* ── Preview ── */
+function buildBundle(p) {
+  const names=Object.keys(p.files);
+  const hn=names.find(n=>n.toLowerCase()==='index.html')||names.find(n=>/\.html?$/i.test(n));
+  if(!hn) return null;
+  let h=p.files[hn];
+  h=h.replace(/<link[^>]+href=["']([^"']+)["'][^>]*>/gi,(_,href)=>{
+    const k=names.find(n=>n===href||n===href.replace(/^\.?\//,''));
+    return k&&/\.css$/i.test(k)?`<style>${p.files[k]}</style>`:_;
+  });
+  h=h.replace(/<script([^>]*)\ssrc=["']([^"']+)["']([^>]*)><\/script>/gi,(_,a,src,b)=>{
+    const k=names.find(n=>n===src||n===src.replace(/^\.?\//,''));
+    return k&&/\.js$/i.test(k)?`<script${a}>${p.files[k]}<\/script>`:_;
+  });
+  return {name:hn, html:h};
+}
+function openPreview() {
+  const p=curProj(), bundle=p?buildBundle(p):null;
+  showM('modalPreview');
+  if(!bundle){ $('previewFrame').classList.add('hidden'); $('previewEmpty').classList.remove('hidden'); $('previewTitle').textContent='Live Preview'; return; }
+  $('previewTitle').textContent=bundle.name;
+  $('previewEmpty').classList.add('hidden');
+  $('previewFrame').classList.remove('hidden');
+  $('previewFrame').srcdoc=bundle.html;
+}
+function previewNewTab() {
+  const p=curProj(), b=p?buildBundle(p):null; if(!b){ toast('No HTML file yet','warn'); return; }
+  const url=URL.createObjectURL(new Blob([b.html],{type:'text/html'}));
+  window.open(url,'_blank'); setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+
+/* ── Project / File actions ── */
+async function actionNewProject() {
+  const name=await promptModal({title:'New project',placeholder:'e.g. Marketing site',hint:'You can rename this anytime.',submit:'Create'});
+  if(!name) return;
+  const p=newProj(name); store.projects.push(p); store.currentId=p.id; save();
+  renderAll(); setView('chat'); toast('Project created','success',1800);
+}
+async function actionRenameProject(id) {
+  const p=store.projects.find(x=>x.id===id); if(!p) return;
+  const name=await promptModal({title:'Rename',value:p.name,submit:'Save'}); if(!name) return;
+  p.name=name.trim()||p.name; touch(p); save(); renderAll(); toast('Renamed','success',1600);
+}
+async function actionDeleteProject(id) {
+  const p=store.projects.find(x=>x.id===id); if(!p) return;
+  const ok=await confirmModal({title:'Delete project?',msg:`"${p.name}" and all its files will be removed.`,ok:'Delete'}); if(!ok) return;
+  store.projects=store.projects.filter(x=>x.id!==id);
+  if(store.currentId===id) store.currentId=store.projects[0]?.id||null;
+  save(); renderAll(); toast('Deleted','info',1600);
+}
+function switchProject(id) { store.currentId=id; save(); renderAll(); setView('chat'); }
+async function actionNewFile() {
+  const p=curProj(); if(!p){ toast('Create a project first','warn'); return; }
+  const name=await promptModal({title:'New file',placeholder:'e.g. index.html',hint:'Include the extension.',submit:'Create'}); if(!name) return;
+  const fn=name.trim(); if(!fn) return;
+  if(p.files[fn]!=null){ toast('File already exists','error'); return; }
+  p.files[fn]=''; p.fileOrder.push(fn); touch(p); save(); renderFiles(); renderTopbar(); openFileModal(fn);
+}
+async function actionDeleteFile() {
+  const p=curProj(), n=ui.fileOpen; if(!p||!n) return;
+  const ok=await confirmModal({title:'Delete file?',msg:`"${n}" will be permanently removed.`,ok:'Delete'}); if(!ok) return;
+  delete p.files[n]; p.fileOrder=p.fileOrder.filter(x=>x!==n); touch(p); save();
+  closeFileModal(); renderFiles(); renderTopbar(); toast('File deleted','info',1600);
+}
+function actionExport() {
+  const p=curProj(); if(!p){ toast('No project to export','warn'); return; }
+  const names=(p.fileOrder||[]).filter(n=>p.files[n]!=null); if(!names.length){ toast('No files yet','warn'); return; }
+  dlText(p.name.replace(/[^a-z0-9_-]/gi,'_')+'.forge.txt', names.map(n=>`=== FILE: ${n} ===\n${p.files[n]}\n=== END FILE ===`).join('\n\n'), 'text/plain');
+  toast('Exported','success',1800);
+}
+function actionExportBackup() { dlText('forge-backup.json',JSON.stringify(store,null,2),'application/json'); toast('Backup exported','success',1800); }
+async function actionClearChat() {
+  const p=curProj(); if(!p||!p.messages.length) return;
+  const ok=await confirmModal({title:'Clear chat?',msg:'Clears conversation. Files are kept.',ok:'Clear'}); if(!ok) return;
+  p.messages=[]; touch(p); save(); renderChat(); renderTopbar();
+}
+async function actionClearData() {
+  const ok=await confirmModal({title:'Clear all data?',msg:'Every project, file and setting will be permanently deleted.',ok:'Clear everything'}); if(!ok) return;
+  localStorage.removeItem(STORE_KEY); store=defaultStore(); applyTheme(); renderAll(); setView('chat');
+}
+
+/* ── Groq streaming ── */
+function setSending(s) {
+  ui.sending=s;
+  const ico=$('sendIco'), btn=$('sendBtn');
+  if(s){ ico.innerHTML=`<span class="spinner" style="border-color:rgba(255,255,255,.3);border-top-color:#fff;"></span>`; btn.dataset.mode='stop'; }
+  else { ico.innerHTML=I.send; btn.dataset.mode='send'; }
+}
+
+async function sendMessage(text) {
+  text=(text||'').trim(); if(!text) return;
+  let p=curProj();
+  if(!p){ p=newProj('My First Project'); store.projects.push(p); store.currentId=p.id; }
+  if(!store.settings.apiKey){ toast('Add your Groq API key in Settings','warn'); setView('settings'); setTimeout(()=>$('apiKeyInput')?.focus(),250); return; }
+  if(ui.sending) return;
+
+  const um={id:uid(),role:'user',content:text,ts:Date.now()};
+  p.messages.push(um); touch(p); save();
+  renderChat(); renderTopbar(); scrollBottom(true);
+  $('chatInput').value=''; autoResize();
+
+  const am={id:uid(),role:'assistant',content:'',ts:Date.now(),streaming:true};
+  p.messages.push(am);
+  renderChat(); scrollBottom(true);
+  setSending(true);
+
+  const ctrl=new AbortController(); ui.abort=ctrl;
+  try {
+    const sys=buildSys(p);
+    const hist=p.messages.filter(m=>m.id!==am.id&&!m.streaming).slice(-MAX_HIST);
+    const apiMsgs=[{role:'system',content:sys},...hist.map(m=>({role:m.role,content:m.content}))];
+
+    const res=await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+store.settings.apiKey},
+      body:JSON.stringify({model:store.settings.model,messages:apiMsgs,temperature:store.settings.temperature,stream:true}),
+      signal:ctrl.signal
+    });
+    if(!res.ok){
+      let d=''; try{const j=await res.json(); d=j.error?.message||'';}catch(e){}
+      throw new Error(d||`Groq error (${res.status})`);
+    }
+
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf='';
+    while(true){
+      const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop();
+      for(const line of lines){
+        const t=line.trim(); if(!t.startsWith('data:')) continue;
+        const d=t.slice(5).trim(); if(!d||d==='[DONE]') continue;
+        try{ const delta=JSON.parse(d).choices?.[0]?.delta?.content; if(delta){am.content+=delta; updateBubble(am);} }catch(e){}
+      }
+    }
+    am.streaming=false; finalizeMsg(p,am);
+  } catch(e) {
+    am.streaming=false;
+    if(e.name==='AbortError'){ am.content=am.content||'_Stopped._'; finalizeMsg(p,am,true); }
+    else { am.error=true; updateBubble(am); toast(e.message||'Could not reach Groq','error',4000); }
+  } finally {
+    setSending(false); ui.abort=null; save();
+  }
+}
+
+function finalizeMsg(p, am, skip) {
+  if(!skip){
+    const parsed=extractFiles(am.content); am._parsed=parsed;
+    let nc=0,uc=0;
+    parsed.files.forEach(f=>{
+      const isNew=p.files[f.filename]==null;
+      if(isNew){p.fileOrder.push(f.filename);nc++;} else uc++;
+      p.files[f.filename]=f.content;
+    });
+    if(nc||uc){
+      const parts=[]; if(nc) parts.push(nc+' file'+(nc>1?'s':'')+' created'); if(uc) parts.push(uc+' updated');
+      toast(parts.join(' · '),'success',2400);
+      renderFiles();
+    }
+  }
+  touch(p); save(); updateBubble(am); renderTopbar();
+}
+
+function stopGen() { if(ui.abort) ui.abort.abort(); }
+
+function autoResize() {
+  const ta=$('chatInput'); if(!ta) return;
+  ta.style.height='auto';
+  ta.style.height=clamp(ta.scrollHeight,24,130)+'px';
+}
+
+/* ── renderAll orchestrator ── */
+function renderAll() { renderTopbar(); renderChat(); renderFiles(); renderProjects(); }
+
+/* ── closeModal ── */
+function closeModal(id) {
+  hideM(id);
+  if(id==='modalPrompt' && ui.promptRes){ ui.promptRes(null); ui.promptRes=null; }
+  if(id==='modalConfirm' && ui.confirmRes){ ui.confirmRes(false); ui.confirmRes=null; }
+  if(id==='modalFile') closeFileModal();
+  if(id==='modalPreview') {}
+}
+
+/* ── Delegated click ── */
+document.addEventListener('click', e => {
+  // backdrop click
+  if(e.target.classList.contains('modal-bg')){ closeModal(e.target.id); return; }
+  const el=e.target.closest('[data-action]'); if(!el) return;
+  const a=el.dataset.action;
+  switch(a){
+    case 'set-view':        setView(el.dataset.view); break;
+    case 'open-qp':         openQP(el.dataset.kind); break;
+    case 'open-palette':    openPalette(); break;
+    case 'close-modal':     closeModal(el.dataset.modal); break;
+    case 'cycle-theme':     cycleTheme(); break;
+    case 'set-theme':       setTheme(el.dataset.theme); renderSettings(); break;
+    case 'new-project':     actionNewProject(); break;
+    case 'new-file':        actionNewFile(); break;
+    case 'switch-project':  switchProject(el.dataset.id); break;
+    case 'rename-project':  e.stopPropagation(); actionRenameProject(el.dataset.id); break;
+    case 'delete-project':  e.stopPropagation(); actionDeleteProject(el.dataset.id); break;
+    case 'open-file':       openFileModal(el.dataset.name); break;
+    case 'use-suggestion':  $('chatInput').value=el.dataset.text; autoResize(); $('chatInput').focus(); break;
+    case 'copy-msg':        curProj()?.messages.find(m=>m.id===el.dataset.id)&&cpText(curProj().messages.find(m=>m.id===el.dataset.id).content).then(()=>toast('Copied','success',1400)); break;
+    case 'retry-msg': {
+      const p=curProj(); if(!p) break;
+      const idx=p.messages.findIndex(m=>m.id===el.dataset.id); if(idx<0) break;
+      let ui2=idx-1; while(ui2>=0&&p.messages[ui2].role!=='user') ui2--;
+      if(ui2<0) break;
+      const t=p.messages[ui2].content; p.messages=p.messages.slice(0,ui2); save(); sendMessage(t); break;
+    }
+    case 'copy-code':       document.getElementById(el.dataset.target)&&cpText(document.getElementById(el.dataset.target).textContent).then(()=>toast('Code copied','success',1400)); break;
+    case 'editor-mode':     setEdMode(el.dataset.mode); break;
+    case 'file-copy':       cpText(curProj()?.files[ui.fileOpen]||'').then(()=>toast('Copied','success',1400)); break;
+    case 'file-download':   { const p=curProj(),n=ui.fileOpen; if(p&&n) dlText(n,p.files[n]||'',mimeFor(n)); break; }
+    case 'file-delete':     actionDeleteFile(); break;
+    case 'open-preview':    openPreview(); break;
+    case 'preview-refresh': openPreview(); break;
+    case 'preview-newtab':  previewNewTab(); break;
+    case 'export-project':  actionExport(); break;
+    case 'export-backup':   actionExportBackup(); break;
+    case 'clear-data':      actionClearData(); break;
+    case 'clear-chat':      actionClearChat(); break;
+    case 'select-model':    store.settings.model=el.dataset.id; save(); renderTopbar(); if(el.dataset.close) hideM('modalQP'); if(ui.view==='settings') renderSettings(); break;
+    case 'select-vibe':     store.settings.vibe=el.dataset.id; save(); renderTopbar(); if(el.dataset.close) hideM('modalQP'); if(ui.view==='settings') renderSettings(); break;
+    case 'toggle-key':      { const inp=$('apiKeyInput'); if(inp){ const pw=inp.type==='password'; inp.type=pw?'text':'password'; el.textContent=pw?'Hide':'Show'; } break; }
+  }
+});
+
+/* ── Input listeners ── */
+document.addEventListener('input', e => {
+  if(e.target.id==='apiKeyInput'){ store.settings.apiKey=e.target.value.trim(); save(); }
+  if(e.target.id==='customVibeInput'){ store.settings.customVibe=e.target.value; save(); }
+  if(e.target.id==='tempInput'){ store.settings.temperature=parseFloat(e.target.value); save(); const v=$('tempVal'); if(v) v.textContent=store.settings.temperature.toFixed(2); }
+  if(e.target.id==='paletteInput') renderPalette(e.target.value);
+  if(e.target.id==='edTA'){ $('fileMlines').textContent=e.target.value.split('\n').length+' lines'; syncGutter(); clearTimeout(saveTimer); saveTimer=setTimeout(commitEdit,350); }
+});
+document.addEventListener('blur', e => {
+  if(e.target.id==='fileMName') renameFile(e.target.value);
+}, true);
+document.addEventListener('scroll', e => {
+  if(e.target.id==='edTA') $('edGutter').scrollTop=e.target.scrollTop;
+}, true);
+
+/* ── Chat form ── */
+$('chatForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if(ui.sending){ stopGen(); return; }
+  sendMessage($('chatInput').value);
+});
+$('chatInput').addEventListener('input', autoResize);
+$('chatInput').addEventListener('keydown', e => {
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){ e.preventDefault(); $('chatForm').requestSubmit(); }
+});
+
+/* ── Prompt / Confirm forms ── */
+$('promptForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v=$('promptInput').value.trim();
+  hideM('modalPrompt');
+  if(ui.promptRes){ ui.promptRes(v||null); ui.promptRes=null; }
+});
+$('confirmOk').addEventListener('click', () => {
+  hideM('modalConfirm');
+  if(ui.confirmRes){ ui.confirmRes(true); ui.confirmRes=null; }
+});
+
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown', e => {
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){ e.preventDefault(); openPalette(); }
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='n'){ e.preventDefault(); actionNewProject(); }
+  if(e.key==='Escape'){
+    if(!$('modalQP').classList.contains('hidden'))       closeModal('modalQP');
+    else if(!$('modalPalette').classList.contains('hidden')) closeModal('modalPalette');
+    else if(!$('modalFile').classList.contains('hidden'))    closeFileModal();
+    else if(!$('modalPreview').classList.contains('hidden')) closeModal('modalPreview');
+    else if(!$('modalConfirm').classList.contains('hidden')) closeModal('modalConfirm');
+    else if(!$('modalPrompt').classList.contains('hidden'))  closeModal('modalPrompt');
+  }
+});
+
+/* ── PWA ── */
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+/* ── Boot ── */
+function boot() {
+  applyTheme();
+  paintIcons();
+  if(!store.projects.length){ const p=newProj('My First Project'); store.projects.push(p); store.currentId=p.id; save(); }
+  renderAll();
+  setView('chat');
+  autoResize();
+}
+boot();
+
+</script>
+</body>
+</html>
